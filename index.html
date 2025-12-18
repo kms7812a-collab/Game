@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Gamer vs Hypocrites</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;500;700;900&display=swap');
+
+        body { margin: 0; overflow: hidden; background-color: #050505; font-family: 'Noto Sans KR', sans-serif; user-select: none; }
+        
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        
+        /* Modern Glass HUD */
+        #hud { 
+            position: absolute; top: 24px; left: 24px; 
+            color: rgba(255, 255, 255, 0.9);
+            background: rgba(10, 10, 15, 0.6); 
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            padding: 20px 24px; 
+            border-radius: 20px; 
+            border: 1px solid rgba(255,255,255,0.08); 
+            min-width: 240px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .hud-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 15px; font-weight: 500; }
+        .hud-val { font-weight: 900; font-size: 18px; letter-spacing: 0.5px; }
+        
+        #coin-val { color: #FFD700; text-shadow: 0 0 10px rgba(255, 215, 0, 0.3); }
+        #kill-val { color: #ff5555; text-shadow: 0 0 10px rgba(255, 85, 85, 0.3); }
+        
+        #controls-hint { 
+            margin-top: 12px; padding-top: 12px; 
+            border-top: 1px solid rgba(255,255,255,0.1); 
+            font-size: 12px; color: rgba(255,255,255,0.4); 
+            font-weight: 300;
+        }
+        
+        /* Minimal Crosshair */
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; width: 6px; height: 6px;
+            background: white; border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 0 4px rgba(0,0,0,0.2);
+            mix-blend-mode: exclusion;
+        }
+
+        /* Modern Toast Notifications */
+        #toast-container {
+            position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%);
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
+            width: 100%; max-width: 800px; pointer-events: none;
+        }
+        .toast {
+            background: rgba(5, 5, 10, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: white; padding: 14px 28px; border-radius: 100px;
+            font-size: 16px; font-weight: 700;
+            opacity: 0; transform: translateY(20px) scale(0.95);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+            text-align: center;
+        }
+        .toast.show { opacity: 1; transform: translateY(0) scale(1); }
+        .toast.good { border-left: 4px solid #00ffaa; color: #ccffee; }
+        .toast.action { border-left: 4px solid #00aaff; color: #dfffff; }
+        .toast.bad { border-left: 4px solid #ff4444; color: #ffcccc; }
+
+        /* Screens */
+        .screen-overlay {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            flex-direction: column; align-items: center; justify-content: center; 
+            pointer-events: auto; z-index: 100;
+            text-align: center;
+            background: radial-gradient(circle at center, rgba(20,20,25,0.95) 0%, rgba(5,5,10,0.98) 100%);
+            padding: 40px; box-sizing: border-box;
+            color: white;
+        }
+
+        #start-screen { display: flex; }
+        
+        h1 { 
+            font-size: 3.5rem; margin: 0 0 20px 0; 
+            font-weight: 900; letter-spacing: -2px;
+            background: linear-gradient(135deg, #fff 0%, #aaa 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        
+        h2 { font-size: 2.5rem; margin-bottom: 20px; color: #ff5555; }
+        
+        p { 
+            font-size: 1.1rem; margin: 0 0 30px 0; color: rgba(255,255,255,0.7); 
+            line-height: 1.6; font-weight: 300; max-width: 700px; 
+        }
+
+        /* Instructions Styling */
+        .instructions-box {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 25px 30px;
+            border-radius: 16px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255,255,255,0.1);
+            max-width: 600px;
+            width: 100%;
+            text-align: left;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .instructions-box h3 {
+            margin: 0 0 15px 0;
+            color: #00ffff;
+            font-size: 1.2rem;
+            border-bottom: 1px solid rgba(255,255,255,0.15);
+            padding-bottom: 10px;
+        }
+        .inst-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            font-size: 1rem;
+            line-height: 2.2;
+            color: #ddd;
+        }
+        .inst-list li { margin-bottom: 4px; }
+        
+        .key {
+            display: inline-block;
+            border: 1px solid rgba(255,255,255,0.4);
+            border-radius: 4px;
+            padding: 0 8px;
+            margin-right: 6px;
+            background: rgba(255,255,255,0.1);
+            font-weight: 700;
+            color: #fff;
+            font-family: monospace;
+            font-size: 1.1em;
+        }
+        .highlight-good { color: #55ff55; font-weight: 700; }
+        .highlight-bad { color: #ff5555; font-weight: 700; }
+        .highlight-warn { color: #ffaa55; font-weight: 700; }
+
+        .key-hint {
+            font-size: 1.5rem; font-weight: 700; color: #00ffff;
+            text-transform: uppercase; letter-spacing: 2px;
+            animation: pulse 2s infinite ease-in-out;
+            margin-top: 10px;
+        }
+
+        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; text-shadow: 0 0 20px rgba(0,255,255,0.5); } 100% { opacity: 0.6; } }
+        
+        .btn {
+            padding: 16px 48px; background: white; color: black;
+            border-radius: 50px; cursor: pointer; font-weight: 800; font-size: 18px;
+            border: none; text-transform: uppercase; font-family: 'Noto Sans KR', sans-serif;
+            transition: all 0.2s ease;
+            box-shadow: 0 0 20px rgba(255,255,255,0.2);
+        }
+        .btn:hover { transform: scale(1.05); box-shadow: 0 0 30px rgba(255,255,255,0.4); }
+
+        /* Floating Dialogue - Simplified */
+        .npc-label {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            pointer-events: none;
+            transform: translate(-50%, -120%);
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.2s;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+
+        /* Damage Number Popup */
+        .popup-text {
+            position: absolute;
+            font-weight: 900;
+            font-size: 28px;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
+            z-index: 10;
+        }
+    </style>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <div id="ui-layer">
+        <div id="hud">
+            <div class="hud-row">
+                <span>Coins</span>
+                <span id="coin-val" class="hud-val">0</span>
+            </div>
+            <div class="hud-row">
+                <span>위선자 제거</span>
+                <span class="hud-val"><span id="kill-val">0</span>/10</span>
+            </div>
+            <div id="controls-hint">W/S: 이동 | A/D: 회전 | E: 스캔</div>
+        </div>
+        <div id="crosshair"></div>
+        <div id="toast-container"></div>
+        
+        <!-- Start Screen -->
+        <div id="start-screen" class="screen-overlay">
+            <h1>당신은 게이머입니다</h1>
+            <p>
+                위선자들로부터 낙인찍히는 게이머의 입장을 경험해보고<br>
+                위선자들로부터 도시를 구하세요
+            </p>
+
+            <div class="instructions-box">
+                <h3>[플레이 방법]</h3>
+                <ul class="inst-list">
+                    <li><span class="key">W</span> <span class="key">S</span>: 전진 및 후진</li>
+                    <li><span class="key">A</span> <span class="key">D</span>: 좌/우 회전 (카메라)</li>
+                    <li><span class="key">E</span>: 스캔 (앞 NPC 확인)</li>
+                    <li><span class="highlight-good">일반시민</span>: 초록 → 가까이 가서 위로 받기 (+동전)</li>
+                    <li><span class="highlight-bad">위선자</span>: 빨강 → 동전으로 2차 스캔하여 제거</li>
+                </ul>
+            </div>
+
+            <div class="key-hint">SPACE to start</div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="game-over" class="screen-overlay">
+            <h2>GAME OVER</h2>
+            <p>
+                위선자에게 잡혔다!<br>
+                당신은 모든 돈을 빼앗기고 병원으로 잡혀가 치료를 받으며 낙인 찍히게 됩니다.
+            </p>
+            <button class="btn" id="restart-btn">재시작 (SPACE)</button>
+        </div>
+
+        <!-- Victory Screen -->
+        <div id="victory-screen" class="screen-overlay">
+            <h2 style="color: #55ff55;">VICTORY!</h2>
+            <p>위선자들로부터 도시를 지켜내는 것에 성공!</p>
+            <button class="btn" id="victory-restart-btn">다시하기 (SPACE)</button>
+        </div>
+        
+        <!-- Container for floating labels -->
+        <div id="labels-container"></div>
+    </div>
+
+    <!-- Import Map for Three.js -->
+    <script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "zustand": "https://esm.sh/zustand@^5.0.9",
+    "react": "https://esm.sh/react@^19.2.3",
+    "@react-three/drei": "https://esm.sh/@react-three/drei@^10.7.7",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "@react-three/fiber": "https://esm.sh/@react-three/fiber@^9.4.2",
+    "uuid": "https://esm.sh/uuid@^13.0.0"
+  }
+}
+</script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- Configuration ---
+        const CONFIG = {
+            CITY_SIZE: 140, 
+            BLOCK_SIZE: 12,
+            STREET_WIDTH: 8,
+            PLAYER_SPEED: 12,
+            ROTATION_SPEED: 2.5, // radians per second (Increased for faster turning)
+            GOOD_NPC_COUNT: 15, 
+            BAD_NPC_COUNT: 15,  
+            NPC_SPEED_IDLE: 3,
+            NPC_SPEED_CHASE: 7.2, 
+            SCAN_DIST: 20,
+            SCAN_FOV: Math.PI / 2,
+            INTERACT_DIST: 2.0,
+            WIN_COUNT: 10
+        };
+
+        // --- Dialogues ---
+        const DIALOGUE = {
+            GOOD_SCAN: ["너 왜 그렇게 힘들어하니?", "조금만 힘내.", "우린 할 수 있어."],
+            GOOD_TOUCH: ["넌 할 수 있어!", "함께 이겨나가자!", "응원할게!"],
+            BAD_SCAN: ["게임 중독 치료받아야지!", "넌 환자야!", "상담받으러 가자!", "돈 내놔!"],
+            BAD_CURE: "현실을 구분 못하는 게임 중독자가 치료를 거부한다!!",
+            BAD_NO_COIN: "돈 없으면 치료도 못 받아!",
+        };
+
+        // --- Globals ---
+        let scene, camera, renderer;
+        let lastTime = performance.now();
+        let animationFrameId;
+        let gameStarted = false;
+        
+        // Horizontal rotation (Yaw) accumulation
+        let currentYaw = 0; 
+
+        // Audio
+        let audioCtx;
+
+        const state = {
+            coins: 0,
+            removedHypocrites: 0,
+            totalHypocrites: 0,
+            gameOver: false,
+            victory: false,
+            npcs: [], 
+            buildings: [], 
+            keys: { w: false, a: false, s: false, d: false },
+            scanning: false,
+            scanTimer: 0,
+            effects: [] 
+        };
+
+        // Resource Cache
+        const RESOURCES = {
+            npcTorsoGeo: new THREE.BoxGeometry(0.8, 0.75, 0.5),
+            npcLegsGeo: new THREE.BoxGeometry(0.75, 0.75, 0.45),
+            npcHeadGeo: new THREE.BoxGeometry(0.4, 0.4, 0.4),
+            npcHairGeo: new THREE.BoxGeometry(0.42, 0.15, 0.42),
+            npcIndGeo: new THREE.SphereGeometry(0.25),
+            
+            // Accessories
+            hatCapGeo: new THREE.BoxGeometry(0.42, 0.15, 0.5),
+            hatTopGeo: new THREE.CylinderGeometry(0.25, 0.25, 0.4, 8),
+            
+            matSkin: new THREE.MeshStandardMaterial({ color: 0xffccaa }),
+            matWhite: new THREE.MeshBasicMaterial({ color: 0xffffff }),
+            matIndGood: new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+            matIndBad: new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+
+            // Scanner Visuals
+            scanBeamGeo: null,
+            scanWireGeo: null,
+            scanPulseGeo: null,
+            scanBeamMat: null,
+            scanWireMat: null,
+            scanPulseMat: null
+        };
+
+        const SHIRT_COLORS = [0x3344dd, 0xdd4433, 0x44dd33, 0xeeeeee, 0x222222, 0xffaa00, 0xaa00ff];
+        const PANT_COLORS = [0x111111, 0x223344, 0x443322, 0x333333, 0x222233];
+        const HAIR_COLORS = [0x111111, 0x442211, 0x664422, 0xaa8844, 0x222222];
+
+        // DOM Elements
+        const uiCoinVal = document.getElementById('coin-val');
+        const uiKillVal = document.getElementById('kill-val');
+        const uiGameOver = document.getElementById('game-over');
+        const uiVictory = document.getElementById('victory-screen');
+        const uiStartScreen = document.getElementById('start-screen');
+        const labelsContainer = document.getElementById('labels-container');
+        const toastContainer = document.getElementById('toast-container');
+        
+        const btnRestart = document.getElementById('restart-btn');
+        const btnVictoryRestart = document.getElementById('victory-restart-btn');
+
+        // --- Audio System ---
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playScanSound() {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.type = 'sine';
+                const now = audioCtx.currentTime;
+                osc.frequency.setValueAtTime(880, now);
+                osc.frequency.exponentialRampToValueAtTime(110, now + 0.3);
+                gain.gain.setValueAtTime(0.08, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.35);
+            } catch(e) { console.warn("Audio play failed", e); }
+        }
+
+        function showNotification(text, type = 'normal') {
+            const el = document.createElement('div');
+            el.className = `toast ${type}`;
+            el.innerText = text;
+            toastContainer.appendChild(el);
+            requestAnimationFrame(() => el.classList.add('show'));
+            setTimeout(() => {
+                el.classList.remove('show');
+                setTimeout(() => el.remove(), 400);
+            }, 3000);
+        }
+
+        // --- Init ---
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0a10); 
+            scene.fog = new THREE.Fog(0x0a0a10, 20, 110);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 1.7, 0);
+            camera.rotation.order = 'YXZ'; 
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+
+            btnRestart.addEventListener('click', restartGame);
+            btnVictoryRestart.addEventListener('click', restartGame);
+
+            const ambi = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambi);
+            
+            const dirLight = new THREE.DirectionalLight(0xaaccff, 1.0);
+            dirLight.position.set(60, 120, 60);
+            dirLight.castShadow = true;
+            dirLight.shadow.camera.top = 80;
+            dirLight.shadow.camera.bottom = -80;
+            dirLight.shadow.camera.left = -80;
+            dirLight.shadow.camera.right = 80;
+            dirLight.shadow.mapSize.set(2048, 2048);
+            scene.add(dirLight);
+
+            const scanR = CONFIG.SCAN_DIST * Math.tan(CONFIG.SCAN_FOV / 2);
+            RESOURCES.scanBeamGeo = new THREE.ConeGeometry(scanR, CONFIG.SCAN_DIST, 32, 1, true);
+            RESOURCES.scanBeamGeo.rotateX(-Math.PI / 2); 
+            RESOURCES.scanBeamGeo.translate(0, 0, -CONFIG.SCAN_DIST / 2);
+            RESOURCES.scanBeamMat = new THREE.MeshBasicMaterial({ 
+                color: 0x00ffff, transparent: true, opacity: 0, 
+                side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending 
+            });
+
+            RESOURCES.scanWireGeo = new THREE.ConeGeometry(scanR, CONFIG.SCAN_DIST, 8, 1, true); 
+            RESOURCES.scanWireGeo.rotateX(-Math.PI / 2); 
+            RESOURCES.scanWireGeo.translate(0, 0, -CONFIG.SCAN_DIST / 2);
+            RESOURCES.scanWireMat = new THREE.MeshBasicMaterial({ 
+                color: 0x88ffff, transparent: true, opacity: 0, 
+                wireframe: true, blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            RESOURCES.scanPulseGeo = new THREE.RingGeometry(0.85, 1.0, 32); 
+            RESOURCES.scanPulseMat = new THREE.MeshBasicMaterial({
+                color: 0xffffff, transparent: true, opacity: 0,
+                side: THREE.DoubleSide, blending: THREE.AdditiveBlending
+            });
+
+            generateCity();
+            resetAndSpawnNPCs(CONFIG.GOOD_NPC_COUNT, CONFIG.BAD_NPC_COUNT);
+            
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+            window.addEventListener('resize', onWindowResize);
+
+            gameLoop();
+        }
+
+        function generateCity() {
+            const plane = new THREE.Mesh(
+                new THREE.PlaneGeometry(500, 500),
+                new THREE.MeshStandardMaterial({ color: 0x111122 })
+            );
+            plane.rotation.x = -Math.PI / 2;
+            plane.receiveShadow = true;
+            scene.add(plane);
+
+            scene.add(new THREE.GridHelper(500, 50, 0x444466, 0x222233));
+
+            const geo = new THREE.BoxGeometry(1, 1, 1);
+            const mat = new THREE.MeshStandardMaterial({ color: 0x333355, roughness: 0.2 });
+            const gridSize = 12; 
+            const cellSize = CONFIG.BLOCK_SIZE + CONFIG.STREET_WIDTH;
+            const offset = (gridSize * cellSize) / 2 - cellSize/2;
+
+            for(let x=0; x<gridSize; x++){
+                for(let z=0; z<gridSize; z++){
+                    if(x >= 5 && x <= 6 && z >= 5 && z <= 6) continue; 
+                    const h = Math.random() * 20 + 5;
+                    const mesh = new THREE.Mesh(geo, mat);
+                    const px = x*cellSize - offset;
+                    const pz = z*cellSize - offset;
+                    mesh.position.set(px, h/2, pz);
+                    mesh.scale.set(CONFIG.BLOCK_SIZE, h, CONFIG.BLOCK_SIZE);
+                    mesh.castShadow = true; 
+                    mesh.receiveShadow = true;
+                    mesh.updateMatrix();
+                    mesh.matrixAutoUpdate = false;
+                    scene.add(mesh);
+                    const box = new THREE.Box3().setFromObject(mesh);
+                    box.expandByScalar(0.5);
+                    state.buildings.push(box);
+                }
+            }
+        }
+
+        function resetAndSpawnNPCs(goodCount, badCount) {
+            state.npcs.forEach(n => {
+                if(n.labelEl) n.labelEl.remove();
+                scene.remove(n.mesh);
+            });
+            state.npcs = [];
+            for(let i=0; i<goodCount; i++) spawnSingleNPC('GOOD');
+            for(let i=0; i<badCount; i++) spawnSingleNPC('HYPOCRITE');
+        }
+
+        function spawnSingleNPC(type) {
+            const group = new THREE.Group();
+            const shirtColor = SHIRT_COLORS[Math.floor(Math.random() * SHIRT_COLORS.length)];
+            const pantColor = PANT_COLORS[Math.floor(Math.random() * PANT_COLORS.length)];
+            const hairColor = HAIR_COLORS[Math.floor(Math.random() * HAIR_COLORS.length)];
+            const shirtMat = new THREE.MeshStandardMaterial({ color: shirtColor });
+            const pantMat = new THREE.MeshStandardMaterial({ color: pantColor });
+            const hairMat = new THREE.MeshStandardMaterial({ color: hairColor });
+            const heightScale = 0.9 + Math.random() * 0.2; 
+            const legs = new THREE.Mesh(RESOURCES.npcLegsGeo, pantMat);
+            legs.position.y = 0.375 * heightScale;
+            legs.scale.y = heightScale;
+            legs.castShadow = true;
+            group.add(legs);
+            const torso = new THREE.Mesh(RESOURCES.npcTorsoGeo, shirtMat);
+            torso.position.y = (0.75 + 0.375) * heightScale;
+            torso.scale.y = heightScale;
+            torso.castShadow = true;
+            group.add(torso);
+            const head = new THREE.Mesh(RESOURCES.npcHeadGeo, RESOURCES.matSkin);
+            head.position.y = (1.5 * heightScale) + 0.2; 
+            head.castShadow = true;
+            group.add(head);
+            const hair = new THREE.Mesh(RESOURCES.npcHairGeo, hairMat);
+            hair.position.y = 0.2;
+            head.add(hair);
+            if (Math.random() > 0.7) {
+                const hatType = Math.random();
+                let hat;
+                if (hatType < 0.5) { hat = new THREE.Mesh(RESOURCES.hatCapGeo, shirtMat); hat.position.set(0, 0.25, 0.1); }
+                else { hat = new THREE.Mesh(RESOURCES.hatTopGeo, new THREE.MeshStandardMaterial({color:0x222222})); hat.position.set(0, 0.3, 0); }
+                head.add(hat);
+            }
+            const ind = new THREE.Mesh(RESOURCES.npcIndGeo, RESOURCES.matWhite.clone());
+            ind.position.y = head.position.y + 0.7;
+            ind.visible = false;
+            group.add(ind);
+            let pos = new THREE.Vector3();
+            let valid = false;
+            let attempts = 0;
+            const range = CONFIG.CITY_SIZE; 
+            while(!valid && attempts < 100) {
+                attempts++;
+                pos.set((Math.random()-0.5)*range, 0, (Math.random()-0.5)*range);
+                if(pos.length() > 15) { 
+                    const box = new THREE.Box3().setFromCenterAndSize(pos, new THREE.Vector3(1,2,1));
+                    valid = !state.buildings.some(b => b.intersectsBox(box));
+                }
+            }
+            group.position.copy(pos);
+            scene.add(group);
+            const label = document.createElement('div');
+            label.className = 'npc-label';
+            labelsContainer.appendChild(label);
+            state.npcs.push({
+                mesh: group, indicator: ind, shirtMat: shirtMat, pantMat: pantMat, hairMat: hairMat,
+                type: type, state: 'IDLE', velocity: new THREE.Vector3(), dirTimer: 0, labelEl: label, labelTimer: 0
+            });
+        }
+
+        function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+        function startGame() {
+            if (gameStarted) return;
+            gameStarted = true;
+            uiStartScreen.style.display = 'none';
+            initAudio();
+        }
+
+        function onKeyDown(e) {
+            if (!gameStarted) { if (e.code === 'Space') startGame(); return; }
+            if (state.gameOver || state.victory) { if (e.code === 'Space') restartGame(); return; }
+            switch(e.code) {
+                case 'KeyW': state.keys.w = true; break;
+                case 'KeyA': state.keys.a = true; break;
+                case 'KeyS': state.keys.s = true; break;
+                case 'KeyD': state.keys.d = true; break;
+                case 'KeyE': performScan(); break;
+            }
+        }
+
+        function onKeyUp(e) {
+            switch(e.code) {
+                case 'KeyW': state.keys.w = false; break;
+                case 'KeyA': state.keys.a = false; break;
+                case 'KeyS': state.keys.s = false; break;
+                case 'KeyD': state.keys.d = false; break;
+            }
+        }
+
+        function performScan() {
+            if (state.scanning || !gameStarted) return;
+            state.scanning = true;
+            state.scanTimer = 0.5;
+            playScanSound();
+            const group = new THREE.Group();
+            const beam = new THREE.Mesh(RESOURCES.scanBeamGeo, RESOURCES.scanBeamMat.clone());
+            group.add(beam);
+            const wire = new THREE.Mesh(RESOURCES.scanWireGeo, RESOURCES.scanWireMat.clone());
+            group.add(wire);
+            const pulse = new THREE.Mesh(RESOURCES.scanPulseGeo, RESOURCES.scanPulseMat.clone());
+            group.add(pulse);
+            camera.add(group);
+            state.effects.push({ type: 'scan', obj: group, beam: beam, wire: wire, pulse: pulse, life: 0.4, maxLife: 0.4 });
+            const camDir = new THREE.Vector3();
+            camera.getWorldDirection(camDir);
+            camDir.y = 0; camDir.normalize();
+            for (let i = state.npcs.length - 1; i >= 0; i--) {
+                const npc = state.npcs[i];
+                const toNpc = new THREE.Vector3().subVectors(npc.mesh.position, camera.position);
+                toNpc.y = 0;
+                if (toNpc.length() < CONFIG.SCAN_DIST && camDir.angleTo(toNpc.clone().normalize()) < CONFIG.SCAN_FOV/2) {
+                    if (npc.state === 'IDLE') {
+                        if (npc.type === 'GOOD') {
+                            npc.state = 'SCANNED_GOOD';
+                            npc.shirtMat.color.setHex(0x00ff00); 
+                            npc.indicator.material = RESOURCES.matIndGood;
+                            npc.indicator.visible = true;
+                            showLabel(npc, pickRandom(DIALOGUE.GOOD_SCAN), '#aaffaa');
+                            showNotification("가까이 다가가서 위로를 받자!", "good");
+                        } else {
+                            npc.state = 'SCANNED_BAD';
+                            npc.shirtMat.color.setHex(0xff0000);
+                            npc.indicator.material = RESOURCES.matIndBad;
+                            npc.indicator.visible = true;
+                            showLabel(npc, pickRandom(DIALOGUE.BAD_SCAN), '#ffaaaa');
+                        }
+                    } else if (npc.state === 'SCANNED_BAD') {
+                        if (state.coins > 0) {
+                            state.coins--; state.removedHypocrites++;
+                            updateUI();
+                            createFloatingText(npc.mesh.position, DIALOGUE.BAD_CURE, '#55ff55');
+                            showNotification("나를 위로해준 사람들의 힘을 모아 위선자를 처치했다!", "action");
+                            removeNPC(i);
+                            if (state.removedHypocrites >= CONFIG.WIN_COUNT) triggerVictory();
+                        } else {
+                            showLabel(npc, DIALOGUE.BAD_NO_COIN, '#ff5555');
+                            showNotification("치료비(코인)가 부족합니다!", "bad");
+                        }
+                    }
+                }
+            }
+        }
+
+        function update(dt) {
+            if (state.gameOver || state.victory || !gameStarted) return;
+
+            // --- Rotation Logic (A/D) ---
+            if (state.keys.a) currentYaw += CONFIG.ROTATION_SPEED * dt;
+            if (state.keys.d) currentYaw -= CONFIG.ROTATION_SPEED * dt;
+            camera.rotation.y = currentYaw;
+            camera.rotation.x = 0; camera.rotation.z = 0;
+
+            // --- Movement Logic (W/S) ---
+            if (state.keys.w || state.keys.s) {
+                const fwd = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), currentYaw);
+                const move = fwd.clone().multiplyScalar(CONFIG.PLAYER_SPEED * dt * (state.keys.w ? 1 : -1));
+                const next = camera.position.clone().add(move);
+                const pBox = new THREE.Box3().setFromCenterAndSize(next, new THREE.Vector3(0.5, 2, 0.5));
+                let col = false;
+                for(let b of state.buildings) if(b.intersectsBox(pBox)) { col = true; break; }
+                if(!col && Math.abs(next.x) < 220 && Math.abs(next.z) < 220) camera.position.add(move);
+            }
+
+            if (state.scanning) {
+                state.scanTimer -= dt;
+                if (state.scanTimer <= 0) state.scanning = false;
+            }
+
+            const playerPos = camera.position;
+            for(let i = state.npcs.length - 1; i >= 0; i--) {
+                const npc = state.npcs[i];
+                const npcPos = npc.mesh.position;
+                let moveDir = new THREE.Vector3();
+                let speed = 0;
+                if (npc.state === 'IDLE') {
+                    speed = CONFIG.NPC_SPEED_IDLE;
+                    npc.dirTimer -= dt;
+                    if(npc.dirTimer <= 0) {
+                        npc.velocity.set(Math.random()-0.5, 0, Math.random()-0.5).normalize();
+                        npc.dirTimer = Math.random()*2 + 1;
+                    }
+                    moveDir.copy(npc.velocity);
+                } 
+                else if (npc.state === 'SCANNED_GOOD') {
+                    speed = 0;
+                    npc.mesh.lookAt(playerPos.x, npcPos.y, playerPos.z);
+                }
+                else if (npc.state === 'SCANNED_BAD') {
+                    speed = CONFIG.NPC_SPEED_CHASE;
+                    moveDir.subVectors(playerPos, npcPos);
+                    moveDir.y = 0; moveDir.normalize();
+                    npc.mesh.lookAt(playerPos.x, npcPos.y, playerPos.z);
+                }
+                if (speed > 0) {
+                    const step = moveDir.clone().multiplyScalar(speed * dt);
+                    const next = npcPos.clone().add(step);
+                    const nBox = new THREE.Box3().setFromCenterAndSize(next, new THREE.Vector3(0.8, 1.4, 0.8));
+                    let col = false;
+                    for(let b of state.buildings) if(b.intersectsBox(nBox)) { col = true; break; }
+                    if(!col) {
+                        npc.mesh.position.copy(next);
+                        if(npc.state === 'IDLE') npc.mesh.lookAt(npcPos.clone().add(moveDir));
+                    } else if (npc.state === 'IDLE') {
+                        npc.velocity.negate();
+                    }
+                }
+                const distSq = npcPos.distanceToSquared(playerPos);
+                if (distSq < CONFIG.INTERACT_DIST * CONFIG.INTERACT_DIST) {
+                    if (npc.state === 'SCANNED_GOOD') {
+                        state.coins++; updateUI();
+                        createFloatingText(npcPos, pickRandom(DIALOGUE.GOOD_TOUCH), '#aaffaa');
+                        createPopup(npcPos, "+1", "#55ff55");
+                        removeNPC(i); spawnSingleNPC('GOOD'); 
+                    } else if (npc.state === 'SCANNED_BAD') {
+                        triggerGameOver();
+                    }
+                }
+            }
+            updateEffects(dt);
+            updateLabels(dt);
+        }
+
+        function updateEffects(dt) {
+            for(let i=state.effects.length-1; i>=0; i--) {
+                const ef = state.effects[i];
+                ef.life -= dt;
+                if (ef.type === 'scan') {
+                     if (ef.life <= 0) {
+                        camera.remove(ef.obj);
+                        ef.beam.material.dispose(); ef.wire.material.dispose(); ef.pulse.material.dispose();
+                        state.effects.splice(i,1);
+                    } else {
+                        const progress = 1 - (ef.life / ef.maxLife);
+                        let beamOp = progress < 0.2 ? (progress / 0.2) * 0.2 : (1 - (progress - 0.2) / 0.8) * 0.2;
+                        ef.beam.material.opacity = beamOp;
+                        ef.wire.material.opacity = beamOp * 1.5; 
+                        const dist = CONFIG.SCAN_DIST * progress;
+                        ef.pulse.position.z = -dist;
+                        const r = Math.tan(CONFIG.SCAN_FOV/2) * dist;
+                        const s = Math.max(0.01, r);
+                        ef.pulse.scale.set(s, s, 1);
+                        ef.pulse.material.opacity = (1 - progress) * 0.8;
+                    }
+                    continue; 
+                }
+                if (ef.type === 'text') {
+                     if (ef.life <= 0) { ef.el.remove(); state.effects.splice(i,1); }
+                     else { ef.pos.y += dt * 2.0; projectLabel(ef.el, ef.pos); ef.el.style.opacity = ef.life / ef.maxLife; }
+                     continue;
+                }
+                if (ef.obj) { 
+                    if (ef.life <= 0) {
+                        camera.remove(ef.obj);
+                        if(ef.obj.children[0]) { ef.obj.children[0].geometry.dispose(); ef.obj.children[0].material.dispose(); }
+                        state.effects.splice(i,1);
+                    } else {
+                        if (ef.obj.children[0]) ef.obj.children[0].material.opacity = (ef.life / ef.maxLife) * 0.3;
+                    }
+                }
+            }
+        }
+
+        function showLabel(npc, text, color) {
+            npc.labelEl.innerText = text;
+            npc.labelEl.style.color = color;
+            npc.labelEl.style.opacity = '1';
+            npc.labelEl.style.borderColor = color;
+            npc.labelTimer = 2.0;
+        }
+
+        function updateLabels(dt) {
+            state.npcs.forEach(npc => {
+                if (npc.labelTimer > 0) {
+                    npc.labelTimer -= dt;
+                    if (npc.labelTimer <= 0) npc.labelEl.style.opacity = '0';
+                    const head = npc.mesh.position.clone();
+                    head.y += 2.6;
+                    projectLabel(npc.labelEl, head);
+                }
+            });
+        }
+
+        function projectLabel(el, pos) {
+            const p = pos.clone().project(camera);
+            if (p.z > 1) el.style.display = 'none';
+            else {
+                el.style.display = 'block';
+                const x = (p.x * 0.5 + 0.5) * window.innerWidth;
+                const y = (-p.y * 0.5 + 0.5) * window.innerHeight;
+                el.style.left = x + 'px'; el.style.top = y + 'px';
+            }
+        }
+
+        function createFloatingText(pos, text, color) {
+            const el = document.createElement('div');
+            el.className = 'npc-label'; el.innerText = text;
+            el.style.color = color; el.style.opacity = '1'; el.style.borderColor = color;
+            labelsContainer.appendChild(el);
+            state.effects.push({ type: 'text', el: el, pos: pos.clone(), life: 1.5, maxLife: 1.5 });
+        }
+
+        function createPopup(pos, text, color) {
+            const el = document.createElement('div');
+            el.className = 'popup-text'; el.innerText = text; el.style.color = color;
+            labelsContainer.appendChild(el);
+            const offset = new THREE.Vector3((Math.random()-0.5)*0.5, 0.5, (Math.random()-0.5)*0.5);
+            state.effects.push({ type: 'text', el: el, pos: pos.clone().add(offset), life: 1.0, maxLife: 1.0 });
+        }
+
+        function removeNPC(idx) {
+            const npc = state.npcs[idx];
+            scene.remove(npc.mesh);
+            if(npc.labelEl) npc.labelEl.remove();
+            state.npcs.splice(idx, 1);
+        }
+
+        function updateUI() {
+            uiCoinVal.innerText = state.coins;
+            uiKillVal.innerText = state.removedHypocrites;
+        }
+
+        function triggerGameOver() {
+            state.gameOver = true;
+            uiGameOver.style.display = 'flex';
+        }
+
+        function triggerVictory() {
+            state.victory = true;
+            uiVictory.style.display = 'flex';
+        }
+
+        function restartGame() {
+            state.gameOver = false; state.victory = false; state.coins = 0; state.removedHypocrites = 0;
+            state.scanning = false; state.keys = { w: false, a: false, s: false, d: false };
+            uiGameOver.style.display = 'none'; uiVictory.style.display = 'none'; uiStartScreen.style.display = 'none';
+            camera.position.set(0, 1.7, 0); 
+            currentYaw = 0;
+            camera.rotation.set(0, 0, 0);
+            resetAndSpawnNPCs(CONFIG.GOOD_NPC_COUNT, CONFIG.BAD_NPC_COUNT);
+            updateUI();
+            if (!gameStarted) { gameStarted = true; initAudio(); }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function gameLoop() {
+            animationFrameId = requestAnimationFrame(gameLoop);
+            const now = performance.now();
+            const dt = Math.min((now - lastTime) / 1000, 0.1);
+            lastTime = now;
+            update(dt);
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
